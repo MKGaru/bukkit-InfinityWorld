@@ -1,0 +1,20 @@
+name: InfinityWorld
+version: 0.0.1
+main: com.igaru.infinityworld.InfinityWorld
+
+commands:
+   basic:
+      description: This is a demo command.
+      usage: /<command> [player]
+      permission: infinityworld.basic
+      permission-message: You don't have <permission>
+   up:
+      description: Move to Upper World.
+      usage: /<command>
+      permission: infinityworld.move.up
+      permission-message: You don't have <permission>
+   down:
+      description: Move to Down World.
+      usage: /<command>
+      permission: infinityworld.move.down
+      permission-message: You don't have <permission>
