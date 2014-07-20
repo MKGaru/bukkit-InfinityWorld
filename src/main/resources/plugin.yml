@@ -18,3 +18,8 @@ commands:
       usage: /<command>
       permission: infinityworld.move.down
       permission-message: You don't have <permission>
+#   fix:
+#      description: Regenelate Chunk.
+#      usage: /<command> [r]
+#      permission: infinityworld.chunk.reset
+#      permission-message: You don't have <permission>

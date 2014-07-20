@@ -14,6 +14,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.bergerkiller.bukkit.common.entity.CommonEntity;
@@ -65,11 +66,12 @@ public class InfinityWorld extends JavaPlugin{
 	//レイヤー0により近い部分がマスター
 	public boolean isMasterLocation(Location location){
 		World world1 = location.getWorld();
-		Block block1 = world1.getBlockAt(location);
-		Block block2 = getRelationBlock(block1);
-		if(block2==null) return true;
+		Location relationLocation = getRelationLocation(location);
+		if(relationLocation == null) return true;
+		World world2 =relationLocation.getWorld();
+		if(world2 == null) return true;
 		LayerInfo layer1 = getLayerInfo(world1);
-		LayerInfo layer2 = getLayerInfo(block2.getWorld());
+		LayerInfo layer2 = getLayerInfo(world2);
 
 		return Math.abs(layer1.number) > Math.abs(layer2.number);
 	}
@@ -105,7 +107,7 @@ public class InfinityWorld extends JavaPlugin{
 			Location nextLocation = entity.getLocation().clone();
 			nextLocation.setWorld(nextWorld);
 			nextLocation.setY(entity.getLocation().getY() + (worldLayerBoder*3 - 255));
-
+			entity.setMetadata("from", new FixedMetadataValue(this,entity.getLocation().getWorld()));
 			teleportWithSyncWorld(entity,nextLocation);
 
 			if(isPlayer){
@@ -129,7 +131,7 @@ public class InfinityWorld extends JavaPlugin{
 			Location nextLocation = entity.getLocation().clone();
 			nextLocation.setWorld(nextWorld);
 			nextLocation.setY( entity.getLocation().getY() - (worldLayerBoder*3 - 255) );
-
+			entity.setMetadata("from", new FixedMetadataValue(this,entity.getLocation().getWorld()));
 			teleportWithSyncWorld(entity,nextLocation);
 
 			if(isPlayer){
@@ -139,32 +141,29 @@ public class InfinityWorld extends JavaPlugin{
 		}
 	}
 
-	public Block getRelationBlock(Block block)
-	{
-		LayerInfo layer = getLayerInfo(block.getWorld());
-
-		if(block.getY() > (255 - worldLayerBoder*3)){
-			World world = getIFWorld(layer.base,layer.number+1);
-			Block relationBlock = world.getBlockAt(
-				block.getX(),
-				block.getY()+(worldLayerBoder*3 -255),
-				block.getZ()
-			);
-			return relationBlock;
+	private Location getRelationLocation(Location location){
+		LayerInfo layer = getLayerInfo(location.getWorld());
+		Location relationLocation = location.clone();
+		if(location.getY() > (255 - worldLayerBoder*3)){
+			relationLocation.setWorld(getIFWorld(layer.base,layer.number+1));
+			relationLocation.setY(location.getY() + (worldLayerBoder*3 -255));
+			return relationLocation;
 		}
-		else if(block.getY() < (worldLayerBoder*3)){
-			World world = getIFWorld(layer.base,layer.number-1);
-			Block relationBlock = world.getBlockAt(
-				block.getX(),
-				block.getY()-(worldLayerBoder*3 -255),
-				block.getZ()
-			);
-			return relationBlock;
+		else if(location.getY() < (worldLayerBoder*3)){
+			relationLocation.setWorld(getIFWorld(layer.base,layer.number-1));
+			relationLocation.setY(location.getY() - (worldLayerBoder*3 -255));
+			return relationLocation;
 		}
 		else{
-			//logMessage(block.getType()+"（"+block.getLocation().toString()+"）"+"相当のブロックが見つかりません(y="+block.getY()+"±"+(worldLayerBoder*3 -255)+")");
 			return null;
 		}
+	}
+
+	public Block getRelationBlock(Block block)
+	{
+		Location location = getRelationLocation(block.getLocation());
+		if(location==null) return null;
+		return location.getWorld().getBlockAt(location);
 	}
 
 
@@ -201,6 +200,26 @@ public class InfinityWorld extends JavaPlugin{
 				return true;
     		}
     	}
+    	/* Chunk Reset Command
+    	if(cmd.getName().equals("fix")){
+    		if(sender instanceof Player){
+    			Player player = (Player)sender;
+    			int r = 1;
+    			if(args.length>0){
+    				try{
+    					r = Integer.parseInt(args[0]);
+    				}catch(NumberFormatException e){
+    					return false;
+    				}
+    			}
+    			Chunk chunk = player.getLocation().getChunk();
+    			for(int i=-r;i<=r;i++)
+    				for(int j=-r;j<=r;j++)
+    						player.getWorld().regenerateChunk(chunk.getX()+i,chunk.getZ()+j);
+    			return true;
+    		}
+    	}
+    	*/
     	return false;
     }
 }

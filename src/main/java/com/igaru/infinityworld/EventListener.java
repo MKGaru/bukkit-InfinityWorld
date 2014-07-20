@@ -35,6 +35,7 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
@@ -118,7 +119,7 @@ public class EventListener implements Listener{
 	/* ブロックの発生 */
 	private void BlockAddEvent(BlockEvent event){
 		Block block = event.getBlock();
-		plugin.logMessage(event.getEventName()+" "+block.getType());
+		//plugin.logMessage(event.getEventName()+" "+block.getType());
 
 		Block relationBlock = plugin.getRelationBlock(block);
 		if(relationBlock!=null){
@@ -129,7 +130,7 @@ public class EventListener implements Listener{
 		BlockState state= event.getNewState();
 		Block block = state.getBlock();
 
-		plugin.logMessage(event.getEventName()+" "+state.getType());
+		//plugin.logMessage(event.getEventName()+" "+state.getType());
 		Block relationBlock = plugin.getRelationBlock(block);
 		if(relationBlock!=null){
 			UpdateBlockState(relationBlock,block);
@@ -179,14 +180,26 @@ public class EventListener implements Listener{
 		hanging.setFacingDirection(blockFace,true);
 	}
 
+	/* 判定大杉
+	@EventHandler
+	public void onBlockPhysics(BlockPhysicsEvent event){
+		if(event.isCancelled()) return;
+		Material material = event.getChangedType();
+		if(material == Material.WATER || material ==Material.STATIONARY_WATER || material==Material.LAVA || material ==Material.STATIONARY_LAVA) return;
+		plugin.logMessage(event.getEventName()+" "+event.getChangedType());
+		BlockAddEvent(event);
+	}
+	*/
 
 	/* ブロックの消滅 */
 	private void BlockRemove(Block block){
 		Block relationBlock = plugin.getRelationBlock(block);
 		if(relationBlock!=null) relationBlock.setType(Material.AIR);
+
 	}
 	private void BlockRemoveEvent(BlockEvent event){
 		BlockRemove(event.getBlock());
+		//plugin.logMessage(event.getEventName()+" "+event.getBlock().getType());
 	}
 	@EventHandler /* ブロックが壊れる時 */
 	public void onBlockBreak(BlockBreakEvent event){
@@ -322,12 +335,22 @@ public class EventListener implements Listener{
 		SpawnReason reason = event.getSpawnReason();
 		Location location = event.getLocation();
 		if(reason != SpawnReason.EGG){
-			if(!plugin.isMasterLocation(location)){
+			if(!plugin.isMasterLocation(location) && !event.getEntity().hasMetadata("from")){
 				event.setCancelled(true);
 				//plugin.logMessage(event.getEntity().getType().getName()+"のスポーンがキャンセルされました。@"+location);
 			}
 		}
 	}
+
+	@EventHandler(priority = EventPriority.LOWEST)
+	public void onItemSpawn(ItemSpawnEvent event){
+		Location location = event.getLocation();
+		if(!plugin.isMasterLocation(location) && !event.getEntity().hasMetadata("from")){
+			event.setCancelled(true);
+			//plugin.logMessage(event.getEntity().getItemStack().getType()+"のスポーンがキャンセルされました。@"+location);
+		}
+	}
+
 
 	private Player getPlayer(String name){
 		for( Player player: Bukkit.getOnlinePlayers()){
