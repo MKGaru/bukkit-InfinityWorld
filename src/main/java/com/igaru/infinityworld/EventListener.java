@@ -16,6 +16,7 @@ import org.bukkit.block.Sign;
 import org.bukkit.block.Skull;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Hanging;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -42,6 +43,7 @@ import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.bergerkiller.bukkit.common.events.EntityMoveEvent;
@@ -147,7 +149,10 @@ public class EventListener implements Listener{
 	}
 	@EventHandler /* 植物が育つ時(コップンでは発生しない) */
 	public void onBlockGrowEvent(BlockGrowEvent event){
-		BlockStateChangeEvent(event);
+		if(!plugin.isMasterLocation(event.getBlock().getLocation())){
+			event.setCancelled(true);
+		}
+		else BlockStateChangeEvent(event);
 	}
 	@EventHandler /* 雪だるまが雪を作る時 */
 	public void onEntityBlockFormEvent(EntityBlockFormEvent event){
@@ -179,17 +184,6 @@ public class EventListener implements Listener{
 		Hanging hanging = relationBlock.getWorld().spawn(location, entity.getClass());
 		hanging.setFacingDirection(blockFace,true);
 	}
-
-	/* 判定大杉
-	@EventHandler
-	public void onBlockPhysics(BlockPhysicsEvent event){
-		if(event.isCancelled()) return;
-		Material material = event.getChangedType();
-		if(material == Material.WATER || material ==Material.STATIONARY_WATER || material==Material.LAVA || material ==Material.STATIONARY_LAVA) return;
-		plugin.logMessage(event.getEventName()+" "+event.getChangedType());
-		BlockAddEvent(event);
-	}
-	*/
 
 	/* ブロックの消滅 */
 	private void BlockRemove(Block block){
@@ -253,9 +247,18 @@ public class EventListener implements Listener{
 			Block block2 = plugin.getRelationBlock(block1);
 			BlockState state = block2.getState();
 			if(state instanceof Furnace){
-				Furnace furnace = (Furnace)state;
-				furnace.setBurnTime((short) event.getBurnTime());
-				furnace.update();
+				final Furnace furnace = (Furnace)state;
+				short time = (short) event.getBurnTime();
+				furnace.setBurnTime(time);
+				furnace.setType(Material.BURNING_FURNACE);
+				furnace.update(true);
+				new BukkitRunnable() {
+					@Override
+		            public void run() {
+						furnace.setType(Material.FURNACE);
+						furnace.update(true);
+					}
+				}.runTaskLater(plugin, time);
 			}
 		}
 	}
@@ -267,30 +270,31 @@ public class EventListener implements Listener{
 				final Block block = event.getClickedBlock();
 				final Block relationBlock = plugin.getRelationBlock(block);
 				if(relationBlock!=null){
-					LayerInfo layer = plugin.getLayerInfo(block.getWorld());
-					LayerInfo relationLayer = plugin.getLayerInfo(relationBlock.getWorld());
 					Player player = event.getPlayer();
 
 					//インベントリを有するブロックは、より0に近いレイヤーのブロックを参照する
 					Material type = block.getType();
-					if(type==Material.CHEST || type==Material.TRAPPED_CHEST||type==Material.FURNACE){
-						if(Math.abs(layer.number) > Math.abs(relationLayer.number)){
+					if(type==Material.CHEST || type==Material.TRAPPED_CHEST||type==Material.FURNACE||type==Material.BURNING_FURNACE){
+						if((!event.getPlayer().isSneaking() ) && plugin.isMasterLocation(block.getLocation())){
 							if(relationBlock!=null){
 								if(type==Material.CHEST || type==Material.TRAPPED_CHEST){
 									try{
 										Chest chest = (Chest)relationBlock.getState();
 										event.setCancelled(true);
 										player.openInventory(chest.getInventory());
+										chest.update(true);
 									}
 									catch(Exception e){
 										e.printStackTrace();
 									}
 								}
-								if(type==Material.FURNACE){
+								if(type==Material.FURNACE||type==Material.BURNING_FURNACE){
 									try{
 										Furnace furnace = (Furnace)relationBlock.getState();
+										((Furnace)block.getState()).setBurnTime(  furnace.getBurnTime());
 										event.setCancelled(true);
 										player.openInventory(furnace.getInventory());
+										furnace.update(true);
 									}catch(Exception e){
 										e.printStackTrace();
 									}
@@ -334,10 +338,21 @@ public class EventListener implements Listener{
 	public void onCreatureSpawn(CreatureSpawnEvent event){
 		SpawnReason reason = event.getSpawnReason();
 		Location location = event.getLocation();
+		Entity entity = event.getEntity();
 		if(reason != SpawnReason.EGG){
-			if(!plugin.isMasterLocation(location) && !event.getEntity().hasMetadata("from")){
+			if(!plugin.isMasterLocation(location) && !entity.hasMetadata("from")){
 				event.setCancelled(true);
 				//plugin.logMessage(event.getEntity().getType().getName()+"のスポーンがキャンセルされました。@"+location);
+			}else{
+				if(entity instanceof Monster && !entity.hasMetadata("mutant")){
+					LayerInfo layer = plugin.getLayerInfo(location.getWorld());
+					double level = 1+Math.abs(layer.number)/5;
+					Monster monster = (Monster)entity;
+					monster.setMaxHealth(monster.getMaxHealth()*level);
+					monster.setHealth(monster.getHealth()*level);
+
+					monster.setMetadata("mutant", new FixedMetadataValue(plugin,"deepMonster"));
+				}
 			}
 		}
 	}

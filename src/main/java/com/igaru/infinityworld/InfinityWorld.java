@@ -86,13 +86,19 @@ public class InfinityWorld extends JavaPlugin{
 	}
 
 
-	private void teleportWithSyncWorld(Entity entity,Location location){
-		CommonEntity<Entity> common = new CommonEntity<Entity>(entity);
-		common.teleport(location);
-		World nextWorld = location.getWorld();
-		nextWorld.setTime(entity.getWorld().getTime());
-		nextWorld.setStorm(entity.getWorld().hasStorm());
-		nextWorld.setWeatherDuration(entity.getWorld().getWeatherDuration());
+	private void teleportWithSyncWorld(final Entity entity, final Location location){
+		if(location.getChunk().isLoaded()){
+			CommonEntity<Entity> common = new CommonEntity<Entity>(entity);
+			World nextWorld = location.getWorld();
+			nextWorld.setTime(entity.getWorld().getTime());
+			nextWorld.setStorm(entity.getWorld().hasStorm());
+			nextWorld.setWeatherDuration(entity.getWorld().getWeatherDuration());
+			common.teleport(location);
+		}else{
+			//まだ移動先チャンクがロードされていないなら、ロードしてからテレポート
+			location.getChunk().load();
+			teleportWithSyncWorld(entity,location);
+		}
 	}
 
 	public void toUp(Entity entity){
