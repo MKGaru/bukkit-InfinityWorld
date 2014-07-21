@@ -73,7 +73,7 @@ public class InfinityWorld extends JavaPlugin{
 		LayerInfo layer1 = getLayerInfo(world1);
 		LayerInfo layer2 = getLayerInfo(world2);
 
-		return Math.abs(layer1.number) > Math.abs(layer2.number);
+		return Math.abs(layer1.number) < Math.abs(layer2.number);
 	}
 
 	public LayerInfo getLayerInfo(World world) {
@@ -113,7 +113,6 @@ public class InfinityWorld extends JavaPlugin{
 			Location nextLocation = entity.getLocation().clone();
 			nextLocation.setWorld(nextWorld);
 			nextLocation.setY(entity.getLocation().getY() + (worldLayerBoder*3 - 255));
-			entity.setMetadata("from", new FixedMetadataValue(this,entity.getLocation().getWorld()));
 			teleportWithSyncWorld(entity,nextLocation);
 
 			if(isPlayer){
@@ -206,7 +205,7 @@ public class InfinityWorld extends JavaPlugin{
 				return true;
     		}
     	}
-    	/* Chunk Reset Command
+    	/*// Chunk Reset Command
     	if(cmd.getName().equals("fix")){
     		if(sender instanceof Player){
     			Player player = (Player)sender;
@@ -225,7 +224,7 @@ public class InfinityWorld extends JavaPlugin{
     			return true;
     		}
     	}
-    	*/
+    	//*/
     	return false;
     }
 }

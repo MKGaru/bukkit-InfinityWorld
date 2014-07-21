@@ -8,7 +8,6 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.Chest;
 import org.bukkit.block.Furnace;
 import org.bukkit.block.Jukebox;
 import org.bukkit.block.NoteBlock;
@@ -35,14 +34,17 @@ import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -69,6 +71,10 @@ public class EventListener implements Listener{
 		else if(location.getY() < (plugin.worldLayerBoder*(layer.number==0?1:2) )){
 			plugin.toDown(entity);
 		}
+	}
+	@EventHandler(priority = EventPriority.HIGH)
+	public void onPlayerDropItem(PlayerDropItemEvent event){
+		event.getItemDrop().setMetadata("from", new FixedMetadataValue(plugin,event.getPlayer()));
 	}
 
 
@@ -113,7 +119,7 @@ public class EventListener implements Listener{
 					destSkull.setSkullType(skull.getSkullType());
 					destSkull.setRotation(skull.getRotation());
 				}
-				destBlockState.update();
+				destBlockState.update(true, false);
             }
 		}.runTaskLater(this.plugin, 1);
 	}
@@ -188,7 +194,14 @@ public class EventListener implements Listener{
 	/* ブロックの消滅 */
 	private void BlockRemove(Block block){
 		Block relationBlock = plugin.getRelationBlock(block);
-		if(relationBlock!=null) relationBlock.setType(Material.AIR);
+		if(relationBlock!=null){
+			if(plugin.isMasterLocation(block.getLocation()))
+				relationBlock.setType(Material.AIR);
+			else{
+				block.setType(Material.AIR);
+				relationBlock.breakNaturally();
+			}
+		}
 
 	}
 	private void BlockRemoveEvent(BlockEvent event){
@@ -274,34 +287,26 @@ public class EventListener implements Listener{
 
 					//インベントリを有するブロックは、より0に近いレイヤーのブロックを参照する
 					Material type = block.getType();
-					if(type==Material.CHEST || type==Material.TRAPPED_CHEST||type==Material.FURNACE||type==Material.BURNING_FURNACE){
-						if((!event.getPlayer().isSneaking() ) && plugin.isMasterLocation(block.getLocation())){
-							if(relationBlock!=null){
-								if(type==Material.CHEST || type==Material.TRAPPED_CHEST){
-									try{
-										Chest chest = (Chest)relationBlock.getState();
-										event.setCancelled(true);
-										player.openInventory(chest.getInventory());
-										chest.update(true);
-									}
-									catch(Exception e){
-										e.printStackTrace();
-									}
-								}
-								if(type==Material.FURNACE||type==Material.BURNING_FURNACE){
-									try{
-										Furnace furnace = (Furnace)relationBlock.getState();
-										((Furnace)block.getState()).setBurnTime(  furnace.getBurnTime());
-										event.setCancelled(true);
-										player.openInventory(furnace.getInventory());
-										furnace.update(true);
-									}catch(Exception e){
-										e.printStackTrace();
-									}
-								}
+					BlockState relationBlockState = relationBlock.getState();
+					if((!event.getPlayer().isSneaking() ) &&
+						(!plugin.isMasterLocation(block.getLocation())) &&
+						relationBlockState instanceof InventoryHolder
+					){
+						InventoryHolder inventoryBlock = (InventoryHolder)relationBlockState;
+						event.setCancelled(true);
+						player.openInventory(inventoryBlock.getInventory());
+
+						if(type==Material.FURNACE||type==Material.BURNING_FURNACE){
+							try{
+								Furnace furnace = (Furnace)relationBlockState;
+								((Furnace)block.getState()).setBurnTime(  furnace.getBurnTime());
+								furnace.update(true);
+							}catch(Exception e){
+								e.printStackTrace();
 							}
 						}
-					}else{
+					}
+					else{
 						//対象ブロックの更新
 						UpdateBlockState(relationBlock,block);
 					}
@@ -317,6 +322,14 @@ public class EventListener implements Listener{
 			for(Block block : blocks){
 				BlockRemove(block);
 			}
+		}
+	}
+	@EventHandler
+	public void onEntityChangeBlock(EntityChangeBlockEvent event){
+		if(!event.isCancelled()){
+			Block block = event.getBlock();
+			Block relationBlock = plugin.getRelationBlock(block);
+			UpdateBlockState(relationBlock,block);
 		}
 	}
 
@@ -356,6 +369,17 @@ public class EventListener implements Listener{
 			}
 		}
 	}
+
+	/*
+	@EventHandler(priority = EventPriority.LOWEST)
+	public void onBlockPhysics(BlockPhysicsEvent event){
+		Block block = event.getBlock();
+		if((!event.isCancelled()) && (!plugin.isMasterLocation(block.getLocation()))){
+			Block relationBlock = plugin.getRelationBlock(block);
+			UpdateBlockState(block,relationBlock);
+		}
+	}
+	*/
 
 	@EventHandler(priority = EventPriority.LOWEST)
 	public void onItemSpawn(ItemSpawnEvent event){
